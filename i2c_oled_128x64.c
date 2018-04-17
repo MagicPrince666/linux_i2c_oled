@@ -9,7 +9,7 @@ int g_fdOled;
 char *g_pstroledDev="/dev/i2c-0";
 uint8_t g_u8oledAddr=0x78>>1;
 
-//---- i2c ioctl data ----
+
 struct i2c_rdwr_ioctl_data g_i2c_iodata;
 //---- i2c dev lock ----
 struct flock g_i2cFdReadLock;
@@ -20,32 +20,6 @@ struct oled_Ascii16x8_Frame_Buff {
 bool refresh_on[4][16]; // 1-refresh 0-no refresh
 char char_buff[4][16];//4 lines x 16 ASCII chars
 } g_Oled_Ascii16x8_Frame={0};
-/*
-//-----------------------------
-//set timer for routine operation
-//500ms
-//-------------------------------
-void initOledTimer(void)
-{
-   g_tmval.it_value.tv_sec=0;
-   g_tmval.it_value.tv_usec=500000; 
-   g_tmval.it_interval.tv_sec=0;
-   g_tmval.it_interval.tv_usec=500000;
-
-   setitimer(ITIMER_REAL,&g_tmval,&g_otmval);
-}
-*/
-
-/*
-//----- routine for SIGALRM ---
-//  !!!!!! NOT to  send command to OLED, It may rise race hazard with other i2c operation 
-void sigHndlOledTimer(int signo)
-{
-    drawOledStr16x8(6,0,"               ");
-    usleep(500000);
-    drawOledStr16x8(6,0,"  Widora-NEO!  ");  
-}
-*/
 
 /*-----------------------------------------
          initiate i2c ioctl data
@@ -58,9 +32,6 @@ void init_I2C_IOdata(void)
     g_i2c_iodata.msgs[0].addr=g_u8oledAddr;
     g_i2c_iodata.msgs[0].flags=0; //write
     g_i2c_iodata.msgs[0].buf=(unsigned char*)malloc(2);
-    //---- set following data in i2c octl functions ---
-//  i2c_iodata.msgs[0].buf[0]=sig; // 0x00 for Command, 0x40 for data
-//  i2c_iodata.msgs[0].buf[1]=val; 
 }
 
 
@@ -113,9 +84,6 @@ void sendDatOled(uint8_t dat)
 /*----- open i2c slave and init ioctl -----*/
 void init_I2C_Slave(void)
 {
-  int fret;
-  struct flock lock;
-
   if((g_fdOled=open(g_pstroledDev,O_RDWR))<0)
   {
 	perror("fail to open i2c bus");
@@ -130,20 +98,9 @@ void init_I2C_Slave(void)
 
   //------ try to lock file
   intFcntlOp(g_fdOled,F_SETLK, F_WRLCK, 0, SEEK_SET,0);//write lock
-  //  intFcntlOp(g_fdOled,F_SETLK, F_RDLCK, 0, SEEK_SET,0);//read lock
   printf("I2C fd lock operation finished.\n");
 
-  //---- init i2c ioctl data -----
   init_I2C_IOdata();
-
-  //-----  set I2C speed ------
-/*
-  if(ioctl(g_fdOled,I2C_SPEED,200000)<0)
-	printf("Set I2C speed fails!\n");
-  else
-	printf("Set I2C speed to 200KHz successfully!\n");
-*/
-
 }
 
  /*---------------------------------------------------------------
@@ -152,57 +109,57 @@ void init_I2C_Slave(void)
 void initOledDefault(void)
 {
   sendCmdOled(0xAE); //display off
-  //-----------------------
+
   sendCmdOled(0x20);  //set memory addressing mode
   sendCmdOled(0x22); //[1:0]=00b-horizontal 01b-veritacal 10b-page addressing mode(RESET)
-  //-----------------------
+
   sendCmdOled(0xb0);  // 0xb0~b7 set page start address for page addressing mode
-  //-----------------------
+
   sendCmdOled(0xc8);// set COM Output scan direction  0xc0-- COM0 to COM[N-1], 0xc8-- COM[N-1] to COM0
-  //-----------------------
+
   sendCmdOled(0x0f);//2); //0x00~0F, set lower column start address for page addressing mode
-  //-----------------------
+
   sendCmdOled(0x10); // 0x10~1F, set higher column start address for page addressing mode
-  //-----------------------
+
   sendCmdOled(0x40); //40~7F set display start line 0x01(5:0)
-  //--------------------
+
   sendCmdOled(0x81); // contrast control
   sendCmdOled(0x7f); //contrast value RESET=7Fh 
-  //--------------------
+
   sendCmdOled(0xa1); //set segment remap a0h--column 0 is mapped to SEG0, a1h--column 127 is mapped to SEG0
-  // ------------------
+
   sendCmdOled(0xa6); //normal / reverse a6h--noraml, 1 in RAM displays; a7h--inverse, 0 in RAM displays.
-  //------------------
+
   sendCmdOled(0xa8); //multiplex ratio
   sendCmdOled(0x3F); // 16MUX to 64MUX RESET=111111b, 0x1F for 128x32; 0x3F for 128x64
-  //----------------
+
   sendCmdOled(0xa4);// A4h-- resume to RAM content display(RESET), A5h--entire display ON.
-  //----------------
+
   sendCmdOled(0xd3);// set display offset, set vertical shift by COM from 0d~63d
   sendCmdOled(0x00);
-  //----------------
+
   sendCmdOled(0xd5); // set desplay clock divide,
   sendCmdOled(0xf0);// [7:4] osc. freq; [3:0] divide ratio, RESET is 00001000B 
-  //----------------
+
   sendCmdOled(0xd9);// set pre-charge period 
   sendCmdOled(0x22);//[3:0] phase 1 period of up to 15 DCLK [7:4] phase 2 period of up to 15 DCLK 
-  //----------------
+  
   sendCmdOled(0xda);//--set COM pins hardware configuration
   sendCmdOled(0x12);//[5:4]  0x02 for 128x32 0x12 for 128x64
-  //----------------
+
   sendCmdOled(0xdb);//set Vcomh deselect level
   sendCmdOled(0x20);
-  //=-------------- 
+
   sendCmdOled(0x8d);// charge pump setting 
   sendCmdOled(0x14);// [2]=0 disable charge pump, [2]=1 enbale charge pump
-  //---------------
+
   sendCmdOled(0xaf);// AE, display off(sleep mode), AF, display on in normal mode.
 }
 
 
 void fillOledDat(uint8_t dat)
 {
-    uint8_t i,j,k;
+    uint8_t i,j;
     //--sed page addressing mode---
     sendCmdOled(0x20);  //set memory addressing mode
     sendCmdOled(0x22); //[1:0]=00b-horizontal 01b-veritacal 10b-page addressing mode(RESET)
@@ -247,7 +204,7 @@ void clearOled(void)
 ------------------------------------------------------*/
 void  drawOledAscii16x8(uint8_t start_row, uint8_t start_column,unsigned char c)
 {
-	int i,j;
+	int j;
 
 	//----replace non-ASCII symbol char with 127 'delta'
 	if(c<32 || c>127) c=127;
@@ -342,7 +299,7 @@ void  drawOledStr16x8(uint8_t start_row, uint8_t start_column,const char* pstr)
 //--------- horizontal mode -----  FAIL !!!!
 void  drawOledAsciiHRC(uint8_t start_row, uint8_t start_column,unsigned char c)
 {
-	int i,j;
+	int j;
 
 	sendCmdOled(0xb0+start_row); //0xB0~B7, page0-7
 	sendCmdOled(0x00+start_column); //00~0f,low column start address  ?? no use !!
@@ -427,7 +384,7 @@ clear oled with vertical addressing mode
 --------------------------------------*/
 void  clearOledV(void)
 {
-	int i,j;
+	int j;
 
 	//----set mode---
 	//-----set as vertical addressing mode -----

@@ -82,7 +82,6 @@ static int recvMsgQue(int msg_id,long msg_type)
 {
    int msg_ret=-1;
 
-   //?????? need to initialize msg_data ????? 
    //-----get IPC message-----
    msg_ret=msgrcv(msg_id,(void *)&g_msg_data,MSG_BUFSIZE,msg_type,IPC_NOWAIT);  // return number of bytes copied into msg buf
    if(msg_ret == EAGAIN)
@@ -113,10 +112,8 @@ static int sendMsgQue(int msg_id,long msg_type, char *data)
 {
     int msg_ret=-1;
 
-//    memset(g_msg_data.text,sizeof(g_msg_data.text),0);
     g_msg_data.msg_type=msg_type;
     strncpy(g_msg_data.text,data,sizeof(g_msg_data.text));
-//    printf("start msgsnd()...\n");
     msg_ret=msgsnd(msg_id,(void *)&g_msg_data,MSG_BUFSIZE,IPC_NOWAIT); //non-blocking
     if(msg_ret == EAGAIN)
     {
@@ -154,21 +151,13 @@ void initOledTimer(void)
 void sigHndlOledTimer(int signo)
 {
    int msg_ret;
-   char strRSSI[5]={0};
 
    //------- receive mssage queue from Ting ------
    msg_ret=recvMsgQue(g_msg_id,MSG_TYPE_TING);
    if(msg_ret >0)
    {
-/*
-        //---get RSSI--
-        strncpy(strRSSI,g_msg_data.text+3,4);
-        //---put to TING buffer ---
-        sprintf(g_strTingBuf,"Ting: %ddBm    ",atoi(strRSSI));
-*/
-	//--- get count
-//        sprintf(g_strTingBuf,"Ting: %d    ",atoi(g_msg_data.text));
-        sprintf(g_strTingBuf,"T:%s    ",g_msg_data.text);
+
+    sprintf(g_strTingBuf,"T:%s    ",g_msg_data.text);
 	//--- push to Oled frame buff
 	push_Oled_Ascii32x18_Buff(g_strTingBuf,2,0);
 	//--- record time stamp
@@ -204,6 +193,6 @@ void sigHndlOledTimer(int signo)
     //--- send msg to CC1101 to let it send msg ----,for CC1101 sndmsg is much faster than Ting.
     //---- Only if there is enought space left for other applications, in case CC1101_rx is down.
     if(getMsgNum(g_msg_id)<MSG_DATA_BUF_NUM/2)
-    		sendMsgQue(g_msg_id,MSG_TYPE_WAIT_CC1101,"wait cc1101");
+    	sendMsgQue(g_msg_id,MSG_TYPE_WAIT_CC1101,"wait cc1101");
 
 }
