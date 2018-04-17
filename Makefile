@@ -1,20 +1,28 @@
-EXEC	= oled
-OBJS    = i2c_oled_128x64.o 
-SRC     = i2c_oled_128x64.c
+CPP = mipsel-openwrt-linux-uclibc-gcc
 
-CROSS	= mipsel-openwrt-linux-uclibc-
-CC	     = $(CROSS)gcc
-STRIP	= $(CROSS)strip
+TARGET	= oled 
+
+DIR		= . 
+INC		= -I. 
 CFLAGS	= -g -Wall
-LDFLAGS += -lm -lpthread
 
-all:  clean $(EXEC)
-	
-$(EXEC):$(OBJS)
-	$(CC) $(LDFLAGS) -o $@ $(OBJS) 
-	$(STRIP) $@
-%.o:%.c
-	$(CC) $(CFLAGS) -c $< -o $@ 
+OBJPATH	= ./obj
+
+FILES	= $(foreach dir,$(DIR),$(wildcard $(dir)/*.c))
+
+OBJS	= $(patsubst %.c,%.o,$(FILES))
+
+all:$(OBJS) $(TARGET)
+
+$(OBJS):%.o:%.c
+	$(CPP) $(CFLAGS) $(INC) -c -o $(OBJPATH)/$(notdir $@) $< 
+
+$(TARGET):$(OBJPATH)
+	$(CPP) -o $@ $(OBJPATH)/*.o
+
+$(OBJPATH):
+	mkdir -p $(OBJPATH)
 
 clean:
-	-rm -f $(EXEC) *.o
+	-rm $(OBJPATH)/*.o
+	-rm $(TARGET)
